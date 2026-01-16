@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 from camera import setup_camera
 from display import draw_hand_landmarks_bgr, make_landmarks_debug_panel
+from minigame_display import SwordSwarmGame
 
 BaseOptions = mp.tasks.BaseOptions
 HandLandmarker = mp.tasks.vision.HandLandmarker
@@ -65,10 +66,15 @@ except Exception:
     landmarker_ctx = HandLandmarker.create_from_options(options)
 
 with landmarker_ctx as landmarker:
+    game = SwordSwarmGame(n_swords=2000, trail=6)
+
     while True:
         ret, frame = cap.read()
         if not ret or frame is None:
             continue
+
+        # Mirror the camera feed for a more natural "selfie" interaction.
+        frame = cv2.flip(frame, 1)
 
         numpy_frame_from_opencv = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=numpy_frame_from_opencv)
@@ -86,6 +92,11 @@ with landmarker_ctx as landmarker:
         # Separate debug window to help you design new gestures
         debug_panel = make_landmarks_debug_panel(latest_result)
         cv2.imshow("landmarks_debug", debug_panel)
+
+        # Minigame window
+        game.update_from_result(latest_result)
+        minigame_frame = game.draw(width=frame.shape[1], height=frame.shape[0])
+        cv2.imshow("minigame", minigame_frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
