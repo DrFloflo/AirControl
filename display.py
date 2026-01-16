@@ -82,10 +82,66 @@ def make_landmarks_debug_panel(result, width=640, height=500):
 
     d = compute_finger_distances(hand)
 
+    # Thumb-specific debug (angle at IP + palm-center proximity)
+    mcp = hand[2]
+    ip = hand[3]
+    tip = hand[4]
+
+    v1x, v1y = (mcp.x - ip.x), (mcp.y - ip.y)
+    v2x, v2y = (tip.x - ip.x), (tip.y - ip.y)
+    dot = v1x * v2x + v1y * v2y
+    n1 = (v1x * v1x + v1y * v1y) ** 0.5
+    n2 = (v2x * v2x + v2y * v2y) ** 0.5
+    thumb_cosang = None
+    if n1 >= 1e-6 and n2 >= 1e-6:
+        thumb_cosang = dot / (n1 * n2)
+
+    # Palm center ~ average of wrist + MCPs (index/middle/ring/pinky)
+    wrist = hand[0]
+    idx_mcp = hand[5]
+    mid_mcp = hand[9]
+    ring_mcp = hand[13]
+    pinky_mcp = hand[17]
+    palm_cx = (wrist.x + idx_mcp.x + mid_mcp.x + ring_mcp.x + pinky_mcp.x) / 5.0
+    palm_cy = (wrist.y + idx_mcp.y + mid_mcp.y + ring_mcp.y + pinky_mcp.y) / 5.0
+
+    def d2_xy(a, bx, by):
+        dx = a.x - bx
+        dy = a.y - by
+        return dx * dx + dy * dy
+
+    thumb_tip_closer_to_palm_than_ip = d2_xy(tip, palm_cx, palm_cy) < d2_xy(ip, palm_cx, palm_cy)
+
     y = 55
     cv2.putText(
         panel,
         f"Extended: thumb={s.thumb} index={s.index} middle={s.middle} ring={s.ring} pinky={s.pinky}",
+        (10, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (180, 220, 180),
+        1,
+        cv2.LINE_AA,
+    )
+    y += 18
+
+    # Show thumb angle metric (cosine). Extended threshold in gesture.py is cos < -0.80.
+    cos_txt = "None" if thumb_cosang is None else f"{thumb_cosang:+.3f}"
+    cv2.putText(
+        panel,
+        f"Thumb IP angle cos={cos_txt} (extended if < -0.80)",
+        (10, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.45,
+        (180, 220, 180),
+        1,
+        cv2.LINE_AA,
+    )
+    y += 18
+
+    cv2.putText(
+        panel,
+        f"Thumb tip closer to palm than IP: {thumb_tip_closer_to_palm_than_ip}",
         (10, y),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.45,
